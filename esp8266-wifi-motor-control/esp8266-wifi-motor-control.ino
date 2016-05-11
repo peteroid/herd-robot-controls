@@ -7,7 +7,6 @@
  */
 
 #include <ESP8266WiFi.h>
-//#include <ESP.h>
 #include <ArduinoJson.h>
 #include <SPI.h>
 #include <math.h>
@@ -19,11 +18,21 @@ extern "C" {
   #include "user_interface.h"
 }
 
-
 #define _min(a,b) ((a)<(b)?(a):(b))
+#define _max(a,b) ((a)>(b)?(a):(b))
 
 #define JSON_READ_BUFFER_SIZE  450
 #define JSON_PARSE_BUFFER_SIZE 360
+
+/* Compass */
+#include "HMC5883L.h"
+
+// class default I2C address is 0x1E
+// specific I2C addresses may be passed as a parameter here
+// this device only supports one I2C address (0x1E)
+HMC5883L mag;
+
+int16_t mx, my, mz;
 
 /* MPU6050 */
 
@@ -36,7 +45,7 @@ MPU6050 mpu;
 
 #define NODE_INTERRUPT_PIN D1
 #define NODE_SDA_PIN       D2
-#define NODE_SCL_PIN       D4
+#define NODE_SCL_PIN       D3
 //#define LED_PIN       13
 //bool blinkState = false;
 
@@ -58,25 +67,25 @@ bool isCalibrated = false;
 int minCalibrateIterations = 10;
 
 volatile bool mpuInterrupt = false;     // indicates whether MPU interrupt pin has gone high
-void dmpDataReady() {
-  mpuInterrupt = true;
-//  Serial.println("interrupt!");
-}
+//void dmpDataReady() {
+//  mpuInterrupt = true;
+////  Serial.println("interrupt!");
+//}
 
-int timerMPUInterval = 50;
+int timerMPUInterval = 20;
 os_timer_t timerMPU;
 bool timerMPUTicked = false;
 void timerCallback(void *pArg);
 
 /* WIFI */
 //const char* ssid     = "UCInet Mobile Access";
-const char* ssid     = "ResNet Mobile Access";
-const char* password = "";
+//const char* ssid     = "ResNet Mobile Access";
+//const char* password = "";
 
-//const char* ssid     = "PETEroiFi";
-//const char* password = "00000000";
+const char* ssid     = "PETEroiFi";
+const char* password = "00000000";
 
-const char* host = "4eaf4a66.ngrok.io";
+const char* host = "951a405d.ngrok.io";
 //const char* host = "dhcp-10-8-019-072.mobile.reshsg.uci.edu";
 //const char* path = "/";
 const char* path = "/~PETEroid/json/output.json";
@@ -90,7 +99,7 @@ byte mac[6];
 bool isReceived = false;
 
 /* SPI Port Expander */
-#define PORT_LATCH_PIN D3
+#define PORT_LATCH_PIN D4
 #define PORT_DATA_PIN  D7
 #define PORT_CLOCK_PIN D5
 
@@ -104,19 +113,39 @@ bool isReceived = false;
 
 unsigned char motorOutput;
 
-typedef struct {
+typedef struct Vec2 {
   float x;
   float y;
 } Vec2;
 
 Vec2 velocity, location, target, acceleration, enemyLocation;
+Vec2 rotationFromTo = {0, 0};
+
 float mass = 1.0;
 float rotation = 0;
-Vec2 rotationFromTo = {0, 0};
 int maxMotorOutput = 999;
 int minMotorOutput = 128;
 int unitMotorOutput = 128;
 int rotateMotorOutput = 999;
+int quadrant;
+int turnDir;
+int lastTurnDir = 1;
+
+bool isXBound, isYBound;
+//int northAngle = 62;
+//int southAngle = 242;
+//int westAngle = 152;
+//int eastAngle = 332;
+
+int northAngle = 135;
+int eastAngle = 225;
+int southAngle = 315;
+int westAngle = 45;
+
+
+
+int boundX = 180;
+int boundY = 120;
 
 int maxSpeedMagnitude = ceil(maxMotorOutput / unitMotorOutput);
 int maxForceMagnitude = maxSpeedMagnitude;
@@ -143,6 +172,37 @@ void printMac (void) {
   Serial.print(mac[1],HEX);
   Serial.print(":");
   Serial.println(mac[0],HEX);
+}
+
+/* Compass */
+
+void initCompass (void) {
+  Wire.begin(D3, D2);
+  Serial.println("Initializing I2C devices...");
+  mag.initialize();
+
+  // verify connection
+  Serial.println("Testing device connections...");
+  Serial.println(mag.testConnection() ? "HMC5883L connection successful" : "HMC5883L connection failed");
+}
+
+void loopCompass (void) {
+ // read raw heading measurements from device
+  mag.getHeading(&mx, &my, &mz);
+
+  // display tab-separated gyro x/y/z values
+//  Serial.print("mag:\t");
+//  Serial.print(mx); Serial.print("\t");
+//  Serial.print(my); Serial.print("\t");
+//  Serial.print(mz); Serial.print("\t");
+  
+// To calculate heading in degrees. 0 degree indicates North
+  float heading = atan2(my, mx);
+  if(heading < 0)
+    heading += 2 * M_PI;
+//  Serial.print("heading:\t");
+//  Serial.println(heading * 180/M_PI);
+  rotation = heading * 180/M_PI;
 }
 
 /* MPU */
@@ -183,7 +243,7 @@ void initMPU (void) {
     // enable Arduino interrupt detection
     Serial.println(F("Enabling interrupt detection (Arduino external interrupt 0)..."));
     Serial.println(digitalPinToInterrupt(NODE_INTERRUPT_PIN));
-    attachInterrupt(digitalPinToInterrupt(NODE_INTERRUPT_PIN), dmpDataReady, RISING);
+//    attachInterrupt(digitalPinToInterrupt(NODE_INTERRUPT_PIN), dmpDataReady, RISING);
     mpuIntStatus = mpu.getIntStatus();
 
     // set our DMP Ready flag so the main loop() function knows it's okay to use it
@@ -253,25 +313,26 @@ bool loopMPU (void) {
 //    Serial.print(ypr[1] * 180 / M_PI);
 //    Serial.print("\t");
 //    Serial.println(ypr[2] * 180 / M_PI);
-    if (isRotating) {
-      float degDiff = fabs(rotation - rotationFromTo.y);
-      if (degDiff > 180)
-        degDiff = 360 - degDiff;
-      Serial.print("deg: ");
-      Serial.println(degDiff);
-      if (degDiff < 3) {
-        resetMotor();
-        isRotating = false;
-      }
-    }
-
     return true;
   }
 }
 
-void timerMPUCallback(void *pArg) {
-  loopMPU();
+void timerMPUCallback (void *pArg) {
   timerMPUTicked = true;
+//  loopMPU();
+  loopCompass();
+  
+  if (isRotating) {
+    float degDiff = fabs(rotation - rotationFromTo.y);
+    if (degDiff > 180)
+      degDiff = 360 - degDiff;
+    Serial.print("deg: ");
+    Serial.println(degDiff);
+    if (degDiff < 5) {
+      resetMotor();
+      isRotating = false;
+    }
+  }
 }
 
 void startTimerMPU(void) {
@@ -421,6 +482,18 @@ void controlMotor (int EN_PIN, int IN1_PIN, int IN2_PIN, int dir, int power) {
   updatePort(motorOutput);
 }
 
+void turnMotor (bool clockwise) {
+  if (clockwise) {
+    lastTurnDir = 1;
+    controlMotor (MOTOR_A_EN, MOTOR_A_IN1, MOTOR_A_IN2, 1, rotateMotorOutput);
+    controlMotor (MOTOR_B_EN, MOTOR_B_IN1, MOTOR_B_IN2, -1, rotateMotorOutput);
+  } else {
+    lastTurnDir = -1;
+    controlMotor (MOTOR_A_EN, MOTOR_A_IN1, MOTOR_A_IN2, -1, rotateMotorOutput);
+    controlMotor (MOTOR_B_EN, MOTOR_B_IN1, MOTOR_B_IN2, 1, rotateMotorOutput);
+  }
+}
+
 void moveMotor(int dir) {
   controlMotor (MOTOR_A_EN, MOTOR_A_IN1, MOTOR_A_IN2, dir, rotateMotorOutput);
   controlMotor (MOTOR_B_EN, MOTOR_B_IN1, MOTOR_B_IN2, dir, rotateMotorOutput);
@@ -435,11 +508,12 @@ void moveBackward() {
 }
 
 void rotateBy(float deg) {
-  rotationFromTo = {rotation, ((int)(rotation + deg + 180) % 360) - 180};
+  rotationFromTo = {rotation, ((int)(rotation + deg) % 360)};
   printVec("rotate from to: ", rotationFromTo);
   isRotating = true;
-  controlMotor (MOTOR_A_EN, MOTOR_A_IN1, MOTOR_A_IN2, 1, rotateMotorOutput);
-  controlMotor (MOTOR_B_EN, MOTOR_B_IN1, MOTOR_B_IN2, -1, rotateMotorOutput);
+//  controlMotor (MOTOR_A_EN, MOTOR_A_IN1, MOTOR_A_IN2, 1, rotateMotorOutput);
+//  controlMotor (MOTOR_B_EN, MOTOR_B_IN1, MOTOR_B_IN2, -1, rotateMotorOutput);
+  turnMotor(deg > 180);
   while(isRotating) {
     yield();
   }
@@ -452,6 +526,7 @@ void updateRotation() {
 void resetMotor () {
   controlMotor (MOTOR_A_EN, MOTOR_A_IN1, MOTOR_A_IN2, 0, 128);
   controlMotor (MOTOR_B_EN, MOTOR_B_IN1, MOTOR_B_IN2, 0, 128);
+  turnDir = 0;
 }
 
 void updateMotor () {
@@ -490,6 +565,89 @@ void updateMotor () {
   Serial.println(b);
 }
 
+bool isRotationInBetween (float a, float b) {
+  if (a >= 270)
+    b += 360;
+  return rotation <= _max(a, b) && rotation >= _min(a, b);
+}
+
+int getQuadrant () {
+  if (isRotationInBetween(westAngle, northAngle)) {
+    return 4;
+  } else if (isRotationInBetween(southAngle, westAngle)) {
+    return 3;
+  } else if (isRotationInBetween(northAngle, eastAngle)) {
+    return 1;
+  } else if (isRotationInBetween(eastAngle, southAngle)) {
+    return 2;
+  }
+
+  Serial.println("Error. should not reach here");
+  return 0;
+}
+
+bool isRobotOutBound () {
+  return location.x <= (boundX * -1) || location.x >= boundX || location.y <= (boundY * -1) || location.y >= boundY;
+}
+
+bool boundBy () {
+  isXBound = location.x <= (boundX * -1) || location.x >= boundX;
+  isYBound = location.y <= (boundY * -1) || location.y >= boundY;
+  
+  if(isXBound && isYBound) {
+    turnMotor(lastTurnDir > 0);
+  } else {
+    //Check coordinate
+    quadrant = getQuadrant();
+
+    if (isXBound) {
+      //Q4
+      if (quadrant == 4) {
+        turnDir = 1;
+      }
+      //Q3
+      if (quadrant == 3) {
+        turnDir = -1;
+      }
+      //Q1
+      if (quadrant == 1) {
+        turnDir = -1;
+      }
+        
+      //Q2
+      if (quadrant == 2) {
+        turnDir = 1;
+      }
+    }
+
+    if (isYBound) {
+      //Q2
+      if(quadrant == 2) {
+        turnDir = -1;
+      }
+        
+      //Q3
+      if(quadrant == 3) {
+        turnDir = 1;
+      }
+
+      //Q4
+      if(quadrant == 4) {
+        turnDir = -1;
+      }
+        
+      //Q1
+      if(quadrant == 1) {
+        turnDir = 1;
+      }
+    }
+
+    turnMotor(turnDir > 0);
+  }
+  
+  return isXBound || isYBound;
+}
+
 void updateMovement () {
   velocity = add(velocity, acceleration);
   updateMotor();
@@ -504,7 +662,7 @@ void updateLocationAndVelocity (Vec2 l, Vec2 v, Vec2 e) {
   printVec("l: ", location);
   printVec("v: ", velocity);
   printVec("e: ", enemyLocation);
-  isReceived = true;
+//  isReceived = true;
 }
 
 //void serialEvent() {
@@ -580,6 +738,63 @@ void printJson (JsonObject& jsonObj) {
     } else {
       Serial.println(it->value.asString());
     }
+  }
+}
+
+void uploadData () {
+  /*  */
+  Serial.print("connecting to ");
+  Serial.println("data.sparkfun.com");
+  
+  // Use WiFiClient class to create TCP connections
+  WiFiClient client;
+  const int httpPort = 80;
+  if (!client.connect("data.sparkfun.com", httpPort)) {
+    Serial.println("connection failed, restart the programme");
+    resetFunc();
+  }
+  
+  // We now create a URI for the request
+  String url = "/input/pw77b7jYOvcXa4xWmjbL?private_key=64nn0nV65AhrAEeBWgZN&rotation=";
+  url += String(rotation);
+  url += "&speed=";
+  url += String(turnDir);
+  url += "&x=";
+  url += String(location.x);
+  url += "&y=";
+  url += String(location.y);
+//  url += streamId;
+//  url += "?private_key=";
+//  url += privateKey;
+//  url += "&value=";
+//  url += value;
+  
+  Serial.print("Requesting URL: ");
+  Serial.println(url);
+  
+  // This will send the request to the server
+  client.print("GET " + url + " HTTP/1.1\r\n" +
+               "Host: " + "data.sparkfun.com" + "\r\n" + 
+               "Connection: close\r\n\r\n\n");
+  unsigned long timeout = millis();
+  while (client.available() == 0) {
+    if (millis() - timeout > 5000) {
+      Serial.println(">>> Client Timeout !");
+      client.stop();
+      return;
+    }
+  }
+
+  unsigned long lastRead = millis();
+  
+  // Read all the lines of the reply from server and print them to Serial
+  while(client.available()){
+//    String line = client.readStringUntil('\r');
+//    Serial.print(line);
+    char c = client.read();
+    Serial.print(c);
+    
+    lastRead = millis();
   }
 }
 
@@ -689,11 +904,16 @@ void setup() {
 
   initWifi();
   initPort();
-  initMPU();
+//  initMPU();
+  initCompass();
 
   ESP.wdtEnable(1000);
 
   Serial.println("Start Calibration");
+
+  // for debug
+  isCalibrated = true;
+  startTimerMPU();
 }
 
 void loop() {
@@ -708,9 +928,28 @@ void loop() {
 
       printVec("v: ", velocity);
     } else {
-      loopPort();
-      Serial.println(rotation);
-//    fetchJson();
+//      loopPort();
+//      Serial.println(rotation);
+      fetchJson();
+      resetMotor();
+      
+//      boundBy();
+//      rotateBy(90);
+      if (boundBy()) {
+//        delay(10);
+      }
+
+      uploadData();
+
+//      if (isRobotOutBound()) {
+////        moveBackward();  
+//      } else {
+//        moveForward();  
+//      }
+      moveForward();
+      
+      delay(100);
+      
     }
   } else {
     if (lastYawIndex == 10) {
