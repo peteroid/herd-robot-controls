@@ -56,6 +56,7 @@ const char* path = "/~PETEroid/json/output.json";
 
 const char* robotName = "red";
 const char* enemyName = "green";
+const char* friendName = "yellow";
 
 byte mac[6];
 bool isReceived = false;
@@ -84,7 +85,7 @@ typedef struct Vec2 {
   float y;
 } Vec2;
 
-Vec2 velocity, location, target, acceleration, enemyLocation;
+Vec2 velocity, location, target, acceleration, enemyLocation, friendLocation;
 Vec2 rotationFromTo = {0, 0};
 
 float mass = 1.0;
@@ -103,7 +104,7 @@ int lastTurnDir = 1;
 const int rotationTimeout = 2000;
 const int rotationTrial = 3;
 
-bool isInScreen, isEnemyInScreen;
+bool isInScreen, isEnemyInScreen, isFriendInScreen;
 bool isOddTrial = true;
 bool isXBound, isYBound;
 const int northAngle = 229;
@@ -679,14 +680,16 @@ void updateMovement () {
   acceleration = {0, 0};
 }
 
-void updateLocationAndVelocity (Vec2 l, Vec2 v, Vec2 e) {
+void updateLocationAndVelocity (Vec2 l, Vec2 v, Vec2 e, Vec2 f) {
   Serial.println("update location");
   location = l;
   velocity = v;
   enemyLocation = e;
+  friendLocation = f;
   printVec("l: ", location);
   printVec("v: ", velocity);
   printVec("e: ", enemyLocation);
+  printVec("f: ", friendLocation);
   //  isReceived = true;
 }
 
@@ -733,13 +736,14 @@ void readJson (char* jsonInput) {
   JsonObject& rootTest = jsonBufferTest.parseObject(jsonInput);
   if (rootTest.success()) {
     Serial.println(F("Json parsed successfully."));
-    Vec2 newLocation = {rootTest[robotName]["x"], rootTest[robotName]["y"]};
-    //    Vec2 newVelocity = {rootTest[robotName]["vx"], rootTest[robotName]["vy"]};
-    Vec2 newVelocity = {0, 0};
-    Vec2 newEnemyLocation = {rootTest[enemyName]["x"], rootTest[enemyName]["y"]};
     isInScreen = rootTest[robotName]["isOn"];
     isEnemyInScreen = rootTest[enemyName]["isOn"];
-    updateLocationAndVelocity(newLocation, newVelocity, newEnemyLocation);
+    isFriendInScreen = rootTest[friendName]["isOn"];
+    updateLocationAndVelocity(
+      {rootTest[robotName]["x"], rootTest[robotName]["y"]},
+      {0, 0},
+      {rootTest[enemyName]["x"], rootTest[enemyName]["y"]},
+      {rootTest[friendName]["x"], rootTest[friendName]["y"]});
   } else {
     Serial.println("Json parsing failed.");
   }
@@ -992,6 +996,11 @@ void loop() {
       if (isEnemyInScreen) {
         rotateTo(getDirectionFrom(enemyLocation, false));
         moveForward(1500);
+      }
+
+      if (isFriendInScreen) {
+        rotateTo(getDirectionFrom(friendLocation, true));
+        moveForward(1000);
       }
     } else {
       // point back to origin and turn
