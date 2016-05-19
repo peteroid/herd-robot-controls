@@ -1,0 +1,338 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 46;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		D6C666611CCDCEA500EE8B1D /* Animal.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D6C6665F1CCDCEA500EE8B1D /* Animal.cpp */; };
+		D6CFCC021CCC23920080EDB5 /* multipleObjectTracking.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D6CFCBFF1CCC23920080EDB5 /* multipleObjectTracking.cpp */; };
+		D6CFCC031CCC23920080EDB5 /* Object.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D6CFCC001CCC23920080EDB5 /* Object.cpp */; };
+		D6CFCC061CCC2B4C0080EDB5 /* libopencv_core.2.4.12.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = D6CFCC041CCC2B4C0080EDB5 /* libopencv_core.2.4.12.dylib */; };
+		D6CFCC071CCC2B4C0080EDB5 /* libopencv_highgui.2.4.12.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = D6CFCC051CCC2B4C0080EDB5 /* libopencv_highgui.2.4.12.dylib */; };
+		D6CFCC091CCC2BB00080EDB5 /* libopencv_imgproc.2.4.12.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = D6CFCC081CCC2BB00080EDB5 /* libopencv_imgproc.2.4.12.dylib */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		D6CFCBF31CCC22AC0080EDB5 /* CopyFiles */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = /usr/share/man/man1/;
+			dstSubfolderSpec = 0;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 1;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
+/* Begin PBXFileReference section */
+		D6C6665F1CCDCEA500EE8B1D /* Animal.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = Animal.cpp; sourceTree = "<group>"; };
+		D6C666601CCDCEA500EE8B1D /* Animal.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = Animal.hpp; sourceTree = "<group>"; };
+		D6C666621CD2223000EE8B1D /* json.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = json.hpp; sourceTree = "<group>"; };
+		D6CFCBF51CCC22AC0080EDB5 /* herd-tracking */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = "herd-tracking"; sourceTree = BUILT_PRODUCTS_DIR; };
+		D6CFCBFF1CCC23920080EDB5 /* multipleObjectTracking.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = multipleObjectTracking.cpp; sourceTree = "<group>"; };
+		D6CFCC001CCC23920080EDB5 /* Object.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = Object.cpp; sourceTree = "<group>"; };
+		D6CFCC011CCC23920080EDB5 /* Object.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Object.h; sourceTree = "<group>"; };
+		D6CFCC041CCC2B4C0080EDB5 /* libopencv_core.2.4.12.dylib */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.dylib"; path = libopencv_core.2.4.12.dylib; sourceTree = "<group>"; };
+		D6CFCC051CCC2B4C0080EDB5 /* libopencv_highgui.2.4.12.dylib */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.dylib"; path = libopencv_highgui.2.4.12.dylib; sourceTree = "<group>"; };
+		D6CFCC081CCC2BB00080EDB5 /* libopencv_imgproc.2.4.12.dylib */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.dylib"; path = libopencv_imgproc.2.4.12.dylib; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		D6CFCBF21CCC22AC0080EDB5 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				D6CFCC061CCC2B4C0080EDB5 /* libopencv_core.2.4.12.dylib in Frameworks */,
+				D6CFCC071CCC2B4C0080EDB5 /* libopencv_highgui.2.4.12.dylib in Frameworks */,
+				D6CFCC091CCC2BB00080EDB5 /* libopencv_imgproc.2.4.12.dylib in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		D6CFCBEC1CCC22AC0080EDB5 = {
+			isa = PBXGroup;
+			children = (
+				D6CFCC081CCC2BB00080EDB5 /* libopencv_imgproc.2.4.12.dylib */,
+				D6CFCC041CCC2B4C0080EDB5 /* libopencv_core.2.4.12.dylib */,
+				D6CFCC051CCC2B4C0080EDB5 /* libopencv_highgui.2.4.12.dylib */,
+				D6CFCBF71CCC22AC0080EDB5 /* herd-tracking */,
+				D6CFCBF61CCC22AC0080EDB5 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		D6CFCBF61CCC22AC0080EDB5 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				D6CFCBF51CCC22AC0080EDB5 /* herd-tracking */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		D6CFCBF71CCC22AC0080EDB5 /* herd-tracking */ = {
+			isa = PBXGroup;
+			children = (
+				D6C666621CD2223000EE8B1D /* json.hpp */,
+				D6CFCBFF1CCC23920080EDB5 /* multipleObjectTracking.cpp */,
+				D6CFCC001CCC23920080EDB5 /* Object.cpp */,
+				D6CFCC011CCC23920080EDB5 /* Object.h */,
+				D6C6665F1CCDCEA500EE8B1D /* Animal.cpp */,
+				D6C666601CCDCEA500EE8B1D /* Animal.hpp */,
+			);
+			path = "herd-tracking";
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		D6CFCBF41CCC22AC0080EDB5 /* herd-tracking */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = D6CFCBFC1CCC22AC0080EDB5 /* Build configuration list for PBXNativeTarget "herd-tracking" */;
+			buildPhases = (
+				D6CFCBF11CCC22AC0080EDB5 /* Sources */,
+				D6CFCBF21CCC22AC0080EDB5 /* Frameworks */,
+				D6CFCBF31CCC22AC0080EDB5 /* CopyFiles */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = "herd-tracking";
+			productName = "herd-tracking";
+			productReference = D6CFCBF51CCC22AC0080EDB5 /* herd-tracking */;
+			productType = "com.apple.product-type.tool";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		D6CFCBED1CCC22AC0080EDB5 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				LastUpgradeCheck = 0730;
+				ORGANIZATIONNAME = How.in.AI;
+				TargetAttributes = {
+					D6CFCBF41CCC22AC0080EDB5 = {
+						CreatedOnToolsVersion = 7.3;
+					};
+				};
+			};
+			buildConfigurationList = D6CFCBF01CCC22AC0080EDB5 /* Build configuration list for PBXProject "herd-tracking" */;
+			compatibilityVersion = "Xcode 3.2";
+			developmentRegion = English;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+			);
+			mainGroup = D6CFCBEC1CCC22AC0080EDB5;
+			productRefGroup = D6CFCBF61CCC22AC0080EDB5 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				D6CFCBF41CCC22AC0080EDB5 /* herd-tracking */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXSourcesBuildPhase section */
+		D6CFCBF11CCC22AC0080EDB5 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				D6CFCC021CCC23920080EDB5 /* multipleObjectTracking.cpp in Sources */,
+				D6CFCC031CCC23920080EDB5 /* Object.cpp in Sources */,
+				D6C666611CCDCEA500EE8B1D /* Animal.cpp in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		D6CFCBFA1CCC22AC0080EDB5 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++0x";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_IDENTITY = "-";
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu99;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 10.11;
+				MTL_ENABLE_DEBUG_INFO = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = macosx;
+			};
+			name = Debug;
+		};
+		D6CFCBFB1CCC22AC0080EDB5 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++0x";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_IDENTITY = "-";
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu99;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 10.11;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				SDKROOT = macosx;
+			};
+			name = Release;
+		};
+		D6CFCBFD1CCC22AC0080EDB5 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++0x";
+				CLANG_CXX_LIBRARY = "libc++";
+				"HEADER_SEARCH_PATHS[arch=*]" = "";
+				LIBRARY_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(PROJECT_DIR)",
+				);
+				OTHER_CFLAGS = (
+					"-I/usr/local/Cellar/opencv/2.4.12_2/include/opencv",
+					"-I/usr/local/Cellar/opencv/2.4.12_2/include",
+					"-L/usr/local/Cellar/opencv/2.4.12_2/lib",
+					"-lopencv_calib3d",
+					"-lopencv_contrib",
+					"-lopencv_core",
+					"-lopencv_features2d",
+					"-lopencv_flann",
+					"-lopencv_gpu",
+					"-lopencv_highgui",
+					"-lopencv_imgproc",
+					"-lopencv_legacy",
+					"-lopencv_ml",
+					"-lopencv_nonfree",
+					"-lopencv_objdetect",
+					"-lopencv_ocl",
+					"-lopencv_photo",
+					"-lopencv_stitching",
+					"-lopencv_superres",
+					"-lopencv_ts",
+					"-lopencv_video",
+					"-lopencv_videostab",
+				);
+				OTHER_CPLUSPLUSFLAGS = "$(OTHER_CFLAGS)";
+				OTHER_LDFLAGS = "-v";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+			};
+			name = Debug;
+		};
+		D6CFCBFE1CCC22AC0080EDB5 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++0x";
+				CLANG_CXX_LIBRARY = "libc++";
+				LIBRARY_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(PROJECT_DIR)",
+				);
+				OTHER_CFLAGS = (
+					"-I/usr/local/Cellar/opencv/2.4.12_2/include/opencv",
+					"-I/usr/local/Cellar/opencv/2.4.12_2/include",
+					"-L/usr/local/Cellar/opencv/2.4.12_2/lib",
+					"-lopencv_calib3d",
+					"-lopencv_contrib",
+					"-lopencv_core",
+					"-lopencv_features2d",
+					"-lopencv_flann",
+					"-lopencv_gpu",
+					"-lopencv_highgui",
+					"-lopencv_imgproc",
+					"-lopencv_legacy",
+					"-lopencv_ml",
+					"-lopencv_nonfree",
+					"-lopencv_objdetect",
+					"-lopencv_ocl",
+					"-lopencv_photo",
+					"-lopencv_stitching",
+					"-lopencv_superres",
+					"-lopencv_ts",
+					"-lopencv_video",
+					"-lopencv_videostab",
+				);
+				OTHER_CPLUSPLUSFLAGS = "$(OTHER_CFLAGS)";
+				OTHER_LDFLAGS = "-v";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		D6CFCBF01CCC22AC0080EDB5 /* Build configuration list for PBXProject "herd-tracking" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				D6CFCBFA1CCC22AC0080EDB5 /* Debug */,
+				D6CFCBFB1CCC22AC0080EDB5 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		D6CFCBFC1CCC22AC0080EDB5 /* Build configuration list for PBXNativeTarget "herd-tracking" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				D6CFCBFD1CCC22AC0080EDB5 /* Debug */,
+				D6CFCBFE1CCC22AC0080EDB5 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = D6CFCBED1CCC22AC0080EDB5 /* Project object */;
+}
