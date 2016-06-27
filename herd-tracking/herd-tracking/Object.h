@@ -7,6 +7,8 @@
 using namespace std;
 using namespace cv;
 
+#define OFF_SCREEN_THRESHOLD 13
+
 class Object
 {
 public:
@@ -43,9 +45,12 @@ public:
     
     bool isOnScreen;
     
+    void setOnScreen (bool is);
+    
 protected:
     Point2f curPos;
 	string type;
 	Scalar HSVmin, HSVmax;
 	Scalar Color;
+    int screenThreshold;
 };

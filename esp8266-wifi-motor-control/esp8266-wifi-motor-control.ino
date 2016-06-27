@@ -9,8 +9,6 @@
 #include "HMC5883L.h"
 #include "I2Cdev.h"
 
-
-
 extern "C" {
 #include "user_interface.h"
 }
@@ -18,8 +16,8 @@ extern "C" {
 #define _min(a,b) ((a)<(b)?(a):(b))
 #define _max(a,b) ((a)>(b)?(a):(b))
 
-#define JSON_READ_BUFFER_SIZE  450
-#define JSON_PARSE_BUFFER_SIZE 360
+#define JSON_READ_BUFFER_SIZE  500
+#define JSON_PARSE_BUFFER_SIZE 500
 
 /* Compass */
 #define NODE_SDA_PIN       D2
@@ -31,10 +29,9 @@ HMC5883L mag;
 int16_t mx, my, mz;
 
 /* Interrupt */
-
 int tickerInterval = 40;
-Ticker ticker;
-void tickerCallback(void);
+Ticker ticker, scTicker;
+bool isSCTickerOn = false;
 
 /* WIFI */
 //const char* ssid     = "UCInet Mobile Access";
@@ -47,16 +44,25 @@ void tickerCallback(void);
 const char* ssid     = "PETEroiFi";
 const char* password = "00000000";
 
-const char* host = "0693c115.ngrok.io";
-//const char* host = "dhcp-10-8-019-072.mobile.reshsg.uci.edu";
+//const char* robotName = "yellow";
+//const char* robotName = "red";
+const char* robotName = "green";
+
+//const char* friendName = "red";
+//const char* friendName = "yellow";
+
+const char* enemyName = "green";
+
+const char* host = "3739f3cc.ngrok.io";
+const char* dataHost = "ade89767.ngrok.io";
+//const char* host = "peteroid.local";
 //const char* path = "/";
-const char* path = "/~PETEroid/json/output.json";
+String settingPath = "/~PETEroid/json/setting.json";
+String movementPath = String("/~PETEroid/json/herds/") + robotName + ".json";
 //const char* streamId   = "....................";
 //const char* privateKey = "....................";
 
-const char* robotName = "red";
-const char* enemyName = "green";
-const char* friendName = "yellow";
+WiFiClient client, dataClient;
 
 byte mac[6];
 bool isReceived = false;
@@ -85,6 +91,11 @@ typedef struct Vec2 {
   float y;
 } Vec2;
 
+typedef struct Vec2i {
+  int x;
+  int y;
+} Vec2i;
+
 Vec2 velocity, location, target, acceleration, enemyLocation, friendLocation;
 Vec2 rotationFromTo = {0, 0};
 
@@ -92,25 +103,36 @@ float mass = 1.0;
 float rotation = 0;
 float uploadRotation = 0;
 float lastRotation = 0;
-const int maxMotorOutput = 600;
+const int maxMotorOutput = 700;
 int minMotorOutput = 128;
 int unitMotorOutput = 128;
 const int rotateMotorOutput = maxMotorOutput;
+int defaultMotorAOutput = rotateMotorOutput;
+int defaultMotorBOutput = rotateMotorOutput;
+Vec2i levelsOutput[4];
+
 const int moveMotorOutput = maxMotorOutput;
 int quadrant;
 int turnDir;
 int lastTurnDir = 1;
+int turnLevel = 0;
+bool isClockwise;
 
 const int rotationTimeout = 2000;
 const int rotationTrial = 3;
 
-bool isInScreen, isEnemyInScreen, isFriendInScreen;
+int motorChangedBufferTotal = 30;
+int motorChangedBuffer = 0;
+
+bool isInScreen, isEnemyInScreen, isFriendInScreen, isOutBound, isDebug, isMoving;
+bool isUploading = true;
 bool isOddTrial = true;
 bool isXBound, isYBound;
-const int northAngle = 229;
-const int eastAngle = (northAngle + 90) % 360;
-const int southAngle = (eastAngle + 90) % 360;
-const int westAngle = (southAngle + 90) % 360;
+//const int northAngle = 242;
+//const int eastAngle = (northAngle + 90) % 360;
+//const int southAngle = (eastAngle + 90) % 360;
+//const int westAngle = (southAngle + 90) % 360;
+int northAngle, eastAngle, southAngle, westAngle;
 
 int motorAOutput = 0;
 int motorBOutput = 0;
@@ -127,7 +149,16 @@ bool isForward = false;
 void resetMotor();
 
 
-void(* resetFunc) (void) = 0;
+
+void restartESP (void) {
+  pinMode(15, OUTPUT);
+  pinMode(0, OUTPUT);
+  pinMode(2, OUTPUT);
+  digitalWrite(15, LOW);
+  digitalWrite(0, HIGH);
+  digitalWrite(2, HIGH);
+  ESP.restart();
+}
 
 void printMac (void) {
   WiFi.macAddress(mac);
@@ -166,15 +197,10 @@ void loopCompass (void) {
   if (heading < 0)
     heading += 2 * M_PI;
   //  Serial.print("heading:\t");
-  //  Serial.println(heading * 180/M_PI);
+//  Serial.print(heading * 180/M_PI);
+//  Serial.print('\t');
   rotation = heading * 180 / M_PI;
 }
-
-//void timer1Callback(void) {
-//  os_intr_lock();
-//  Serial.println("1");
-//  os_intr_unlock();
-//}
 
 void tickerCallback (void) {
   // disable ISR
@@ -216,18 +242,18 @@ void tickerCallback (void) {
   os_intr_unlock();
 }
 
-void stopTicker() {
-  ticker.detach();
-}
+//void stopTicker() {
+//  ticker.detach();
+//}
 
-void startTicker(long interval) {
-  // enable the timer interrupt for the compass
-  ticker.attach_ms(interval, tickerCallback);
-  
-//  os_timer_setfn(&timer1, , NULL);
-//  os_timer_arm(&timer1, timerMPUInterval, REPEAT);
-//  ticker.attach_ms(timerMPUInterval, timer1Callback);
-}
+//void startTicker(long interval) {
+//  // enable the timer interrupt for the compass
+//  ticker.attach_ms(interval, tickerCallback);
+//  
+////  os_timer_setfn(&timer1, , NULL);
+////  os_timer_arm(&timer1, timerMPUInterval, REPEAT);
+////  ticker.attach_ms(timerMPUInterval, timer1Callback);
+//}
 
 /* Wifi */
 
@@ -252,6 +278,34 @@ void initWifi(void) {
   Serial.println("WiFi connected");
   Serial.println("IP address: ");
   Serial.println(WiFi.localIP());
+
+  wifiConnectTime = 0;
+  Serial.print("connecting to ");
+  Serial.println(host);
+
+  wifiConnectTime = millis();
+  /* time: 1000~1860ms */
+  // Use WiFiClient class to create TCP connections
+  const int httpPort = 80;
+  if (!client.connect(host, httpPort)) {
+    Serial.println("connection failed, restart the programme");
+    restartESP();
+  }
+  /* END */
+  wifiConnectTime = millis() - wifiConnectTime;
+
+  Serial.println("Host connected!");
+
+  Serial.print("connecting to ");
+  Serial.println(dataHost);
+
+  // Use WiFiClient class to create TCP connections
+  if (!dataClient.connect(dataHost, httpPort)) {
+    Serial.println("data connection failed. skip");
+//    restartESP();
+//    return;
+  }
+  Serial.println("Data Host connected!");
 }
 
 /*  Movement  */
@@ -398,7 +452,72 @@ void moveMotor(int dir, int aOut, int bOut) {
   moveBMotor(dir, bOut);
 }
 
+bool rotateBy (float deg) {
+  Serial.println("rotate by");
+  int trial = rotationTrial;
+  rotationFromTo = {rotation, ((int)(rotation + deg) % 360)};
+  //  printVec("rotate from to: ", rotationFromTo);
+  isRotating = true;
+  //  controlMotor (MOTOR_A_EN, MOTOR_A_IN1, MOTOR_A_IN2, 1, rotateMotorOutput);
+  //  controlMotor (MOTOR_B_EN, MOTOR_B_IN1, MOTOR_B_IN2, -1, rotateMotorOutput);
+  turnMotor(deg > 180);
+
+  Serial.print("start rotating\t");
+  long startTime = millis();
+  long timeElapsed;
+  // finish rotate or timeout
+  while (isRotating) {
+//    yield();
+    timeElapsed = millis() - startTime;
+//    Serial.print(timeElapsed);
+//    Serial.print('\t');
+    if (timeElapsed < rotationTimeout) {
+      loopCompass();
+      float degDiff = fabs(rotation - rotationFromTo.y);
+      if (degDiff > 180)
+        degDiff = 360 - degDiff;
+        
+      if (degDiff < 3) {
+        Serial.println("\ncorrect!");
+        resetMotor();
+        isRotating = false;
+      }
+    } else {
+      Serial.println("\ntimeout");
+      return false;
+    }
+//    Serial.println();
+//    Serial.print(millis());
+//    Serial.print(':');
+    delay(50);
+//    Serial.print(millis());
+//    Serial.println();
+//    if (millis() - startTime > rotationTimeout) {
+//      // try to fix
+//      trial--;
+//      switch (trial) {
+//        case 1:
+//          moveMotor(1, moveMotorOutput, moveMotorOutput);
+//          break;
+//        case 2:
+//          moveMotor(-1, moveMotorOutput, moveMotorOutput);
+//          break;
+//        default:
+//          return false;  
+//      }
+//      Serial.print(rotationTrial - trial);
+//      Serial.println("-th fix");
+//      delay(300);
+//      turnMotor(deg > 180);
+//      startTime = millis();
+//    }
+  }
+  Serial.println("end rotate by");
+  return true;
+}
+
 bool rotateTo (float desired) {
+//  loopCompass();
   float diff = rotation - desired;
   //  Serial.println(diff);
   if (diff < -2) {
@@ -408,68 +527,143 @@ bool rotateTo (float desired) {
   }
 }
 
-void moveForward(long duration) {
-  lastRotation = rotation;
-  int selfCorrectInterval = 300;
-  do {
-    moveMotor(1, moveMotorOutput, moveMotorOutput);
-    delay(selfCorrectInterval);
-    rotateTo(lastRotation);
-    duration -= selfCorrectInterval;
-  } while (duration > 0);
-
-  resetMotor();
+void stopSelfCorrectionTicker() {
+  scTicker.detach();
+  isSCTickerOn = false;
 }
 
-void moveBackward(long duration) {
-  lastRotation = rotation;
-  int selfCorrectInterval = 300;
-  do {
-    moveMotor(-1, moveMotorOutput, moveMotorOutput);
-    delay(selfCorrectInterval);
-    rotateTo(lastRotation);
-    duration -= selfCorrectInterval;
-  } while (duration > 0);
-
-  resetMotor();
+void startSelfCorrectionTicker (long interval) {
+  scTicker.attach_ms(interval, selfCorrectionCallback);
+  isSCTickerOn = true;
 }
 
-bool rotateBy(float deg) {
-  Serial.println("rotate by");
-  long startTime = millis();
-  int trial = rotationTrial;
-  rotationFromTo = {rotation, ((int)(rotation + deg) % 360)};
-  //  printVec("rotate from to: ", rotationFromTo);
-  isRotating = true;
-  //  controlMotor (MOTOR_A_EN, MOTOR_A_IN1, MOTOR_A_IN2, 1, rotateMotorOutput);
-  //  controlMotor (MOTOR_B_EN, MOTOR_B_IN1, MOTOR_B_IN2, -1, rotateMotorOutput);
-  turnMotor(deg > 180);
+void selfCorrectionCallback () {
+  os_intr_lock();
+//  Serial.print("sc start: ");
+//  Serial.println(millis());
 
-  // finish rotate or timeout
-  while (isRotating) {
-    yield();
-    if (millis() - startTime > rotationTimeout) {
-      // try to fix
-      trial--;
-      switch (trial) {
-        case 1:
-          moveMotor(1, moveMotorOutput, moveMotorOutput);
-          break;
-        case 2:
-          moveMotor(-1, moveMotorOutput, moveMotorOutput);
-          break;
-        default:
-          return false;  
+  if (motorChangedBuffer != 0) {
+    motorChangedBuffer--;
+  } else {
+    loopCompass();
+    float diff = rotation - lastRotation;
+    int newTurnLevel = turnLevel;    
+    
+    float absDiff = diff;
+    while (absDiff > 360) {
+        absDiff -= 360;
+    }
+    while (absDiff < 0) {
+        absDiff += 360;
+    }
+
+    bool isPreviousClockwise = isClockwise;
+    isClockwise = absDiff > 180;
+    if (isClockwise) {
+      // prepare for the next checking
+      absDiff = 360 - absDiff;
+    }
+    
+    if (absDiff > 90) {
+      // lv3
+      newTurnLevel = 3;
+    } else if (absDiff > 45) {
+      // lv2
+      newTurnLevel = 2;
+    } else if (absDiff > 10) {
+      // lv1
+      newTurnLevel = 1;
+    } else {
+      newTurnLevel = 0;
+    }
+
+    Serial.print("R: ");
+    Serial.print(rotation);
+    Serial.print("diff: ");
+    Serial.print(diff);
+    Serial.print(" abs: ");
+    Serial.print(absDiff);
+    Serial.print(" turn: ");
+    Serial.println(newTurnLevel);
+
+//    int a = 0, b = 0;
+//    if (newTurnLevel == 1) {
+//      a = levels;
+//      b = -30;
+//    } else if (newTurnLevel == 2) {
+//      a = -180;
+//      b = -100;
+//    } else if (newTurnLevel == 3) {
+//      a = -210;
+//      b = -230;
+//    }
+    
+    // changed
+    if (newTurnLevel != turnLevel || isPreviousClockwise != isClockwise) {
+      motorChangedBuffer = motorChangedBufferTotal;
+      Serial.print("changed: ");
+      Serial.print(turnLevel);
+      Serial.print("->");
+      Serial.print(newTurnLevel);
+      Serial.print(" diff: ");
+      Serial.print(diff);
+      Serial.print(" abs: ");
+      Serial.println(absDiff);
+      turnLevel = newTurnLevel;
+      if (isClockwise) {
+        moveMotor(1, levelsOutput[newTurnLevel].y, levelsOutput[newTurnLevel].x);
+      } else {
+        moveMotor(1, levelsOutput[newTurnLevel].x, levelsOutput[newTurnLevel].y);
+        
       }
-      Serial.print(rotationTrial - trial);
-      Serial.println("-th fix");
-      delay(300);
-      turnMotor(deg > 180);
-      startTime = millis();
+//      if (newTurnLevel > 0) {
+//        if (isClockwise) {
+//          moveMotor (1, a, b);
+//        } else {
+//          moveMotor (1, a, b);  
+//        }
+//      } else {
+//        moveMotor (1, defaultMotorAOutput, defaultMotorBOutput);
+//      }
+//      moveMotor(1, levelsOutput[newTurnLevel].x, levelsOutput[newTurnLevel].y);
     }
   }
-  Serial.println("end rotate by");
-  return true;
+  
+  
+//  rotationFromTo = {rotation, ((int)(rotation + diff) % 360)};
+//  printVec("rotate from to: ", rotationFromTo);
+//  turnMotor(deg > 180);
+  
+  
+
+//  Serial.print("sc end: ");
+//  Serial.println(millis());
+  os_intr_unlock();
+}
+
+void moveAlong (float angle) {
+  lastRotation = angle;
+  moveMotor(1, moveMotorOutput, moveMotorOutput);
+  startSelfCorrectionTicker(rotationTimeout);
+}
+
+void moveIn (int dir) {
+  Serial.print("Move: ");
+  Serial.println(dir);
+//  turnLevel = 0;
+  isMoving = true;
+  lastRotation = rotation;
+  moveMotor(dir, moveMotorOutput, moveMotorOutput);
+  stopSelfCorrectionTicker();
+  startSelfCorrectionTicker(50);
+}
+
+void moveForward () {
+  moveIn(1);
+}
+
+void moveBackward () {
+  moveIn(-1);
 }
 
 void updateRotation() {
@@ -478,10 +672,13 @@ void updateRotation() {
 
 void resetMotor () {
   Serial.println("reset motor");
+  stopSelfCorrectionTicker();
+  
   isRotating = false;
   isForward = false;
-  controlMotor (MOTOR_A_EN, MOTOR_A_IN1, MOTOR_A_IN2, 0, 128);
-  controlMotor (MOTOR_B_EN, MOTOR_B_IN1, MOTOR_B_IN2, 0, 128);
+  controlMotor (MOTOR_A_EN, MOTOR_A_IN1, MOTOR_A_IN2, 0, 0);
+  controlMotor (MOTOR_B_EN, MOTOR_B_IN1, MOTOR_B_IN2, 0, 0);
+  
   //  turnDir = 0;
 }
 
@@ -538,7 +735,8 @@ int getQuadrant () {
     return 2;
   }
 
-  Serial.println("Error. should not reach here");
+  Serial.print("Error. should not reach here: ");
+  Serial.println(rotation);
   return 0;
 }
 
@@ -703,28 +901,34 @@ void initPort() {
 }
 
 void loopPort() {
-  //  Serial.println("loop Port");
-  //  int power = 800;
-  //  controlMotor (MOTOR_A_EN, MOTOR_A_IN1, MOTOR_A_IN2, 0, power);
-  //  delay(500);
-  //  controlMotor (MOTOR_B_EN, MOTOR_B_IN1, MOTOR_B_IN2, 0, power);
-  //  delay(500);
-  //  controlMotor (MOTOR_A_EN, MOTOR_A_IN1, MOTOR_A_IN2, 1, power);
-  //  delay(500);
-  //  controlMotor (MOTOR_A_EN, MOTOR_A_IN1, MOTOR_A_IN2, -1, power);
-  //  delay(500);
-  //  controlMotor (MOTOR_B_EN, MOTOR_B_IN1, MOTOR_B_IN2, 1, power);
-  //  delay(500);
-  //  controlMotor (MOTOR_B_EN, MOTOR_B_IN1, MOTOR_B_IN2, -1, power);
-  //  delay(500);
-  if (!isRotating) {
-    delay(2000);
-    Serial.println("Start rotating");
-    moveForward(1000);
-    rotateBy(90);
-//    moveBackward();
-    delay(1000);
-  }
+    Serial.println("loop Port");
+    int power = 800;
+    Serial.println("stop A");
+    controlMotor (MOTOR_A_EN, MOTOR_A_IN1, MOTOR_A_IN2, 0, power);
+    delay(500);
+    Serial.println("stop B");
+    controlMotor (MOTOR_B_EN, MOTOR_B_IN1, MOTOR_B_IN2, 0, power);
+    delay(500);
+    Serial.println("for A");
+    controlMotor (MOTOR_A_EN, MOTOR_A_IN1, MOTOR_A_IN2, 1, power);
+    delay(500);
+    Serial.println("back A");
+    controlMotor (MOTOR_A_EN, MOTOR_A_IN1, MOTOR_A_IN2, -1, power);
+    delay(500);
+    Serial.println("for B");
+    controlMotor (MOTOR_B_EN, MOTOR_B_IN1, MOTOR_B_IN2, 1, power);
+    delay(500);
+    Serial.println("back B");
+    controlMotor (MOTOR_B_EN, MOTOR_B_IN1, MOTOR_B_IN2, -1, power);
+    delay(500);
+//  if (!isRotating) {
+//    delay(2000);
+//    Serial.println("Start rotating");
+//    moveForward(1000);
+//    rotateBy(90);
+////    moveBackward();
+//    delay(1000);
+//  }
 }
 
 /* Wifi */
@@ -736,14 +940,82 @@ void readJson (char* jsonInput) {
   JsonObject& rootTest = jsonBufferTest.parseObject(jsonInput);
   if (rootTest.success()) {
     Serial.println(F("Json parsed successfully."));
-    isInScreen = rootTest[robotName]["isOn"];
-    isEnemyInScreen = rootTest[enemyName]["isOn"];
-    isFriendInScreen = rootTest[friendName]["isOn"];
-    updateLocationAndVelocity(
-      {rootTest[robotName]["x"], rootTest[robotName]["y"]},
-      {0, 0},
-      {rootTest[enemyName]["x"], rootTest[enemyName]["y"]},
-      {rootTest[friendName]["x"], rootTest[friendName]["y"]});
+    isInScreen = rootTest["isOn"];
+//    isEnemyInScreen = rootTest[enemyName]["isOn"];
+//    isFriendInScreen = rootTest[friendName]["isOn"];
+    isDebug = rootTest["isDebug"];
+
+    JsonArray& arr = rootTest["levels"];
+    int count = 0;
+    for(JsonArray::iterator it=arr.begin(); it!=arr.end(); ++it) {
+        // *it contains the JsonVariant which can be casted as usuals
+      JsonObject& obj = *it;
+      Vec2i level = {obj["a"], obj["b"]};
+      levelsOutput[count] = level;
+      Serial.print(count);
+      Serial.print(":\t");
+      Serial.print(level.x);
+      Serial.print('\t');
+      Serial.println(level.y);
+
+      count++;
+    }
+    defaultMotorAOutput = levelsOutput[0].x;
+    defaultMotorBOutput = levelsOutput[0].y;
+    
+    if (isDebug) {
+      moveMotor(1, defaultMotorAOutput, defaultMotorBOutput);
+      if (isSCTickerOn) {
+        stopSelfCorrectionTicker();
+      }
+    } else {
+      isOutBound = rootTest["isOut"];
+
+      lastRotation = rootTest["flockRotation"];
+      location = {rootTest["x"], rootTest["y"]};
+
+//      turnLevel = rootTest["level"];
+
+//      isClockwise = rootTest["isCW"];
+      
+    }
+    
+    
+    
+//    updateLocationAndVelocity(
+//      {rootTest[robotName]["x"], rootTest[robotName]["y"]},
+//      {0, 0},
+//      {rootTest[enemyName]["x"], rootTest[enemyName]["y"]},
+//      {rootTest[friendName]["x"], rootTest[friendName]["y"]});
+
+//    moveMotor(1, rootTest["motor"]["a"], rootTest["motor"]["b"]);
+  } else {
+    Serial.println("Json parsing failed.");
+  }
+}
+
+
+void readSettingJson (char* jsonInput) {
+  StaticJsonBuffer<JSON_PARSE_BUFFER_SIZE> jsonBufferTest;
+  JsonObject& rootTest = jsonBufferTest.parseObject(jsonInput);
+  if (rootTest.success()) {
+    northAngle = rootTest["northAngle"];
+    southAngle = rootTest["southAngle"];
+    westAngle = rootTest["westAngle"];
+    eastAngle = rootTest["eastAngle"];
+    motorChangedBufferTotal = rootTest["scBuffer"];
+
+    Serial.println(F("Settings updated: "));
+    Serial.print(northAngle);
+    Serial.print('\t');
+    Serial.print(eastAngle);
+    Serial.print('\t');
+    Serial.print(southAngle);
+    Serial.print('\t');
+    Serial.print(westAngle);
+    Serial.print('\t');
+    Serial.print(motorChangedBufferTotal);
+    Serial.print('\n');
   } else {
     Serial.println("Json parsing failed.");
   }
@@ -767,22 +1039,13 @@ void printJson (JsonObject& jsonObj) {
 
 void uploadData () {
   /*  */
-  Serial.print("connecting to ");
-  Serial.println("data.sparkfun.com");
-
-  // Use WiFiClient class to create TCP connections
-  WiFiClient client;
-  const int httpPort = 80;
-  if (!client.connect("data.sparkfun.com", httpPort)) {
-    Serial.println("connection failed, restart the programme");
-    resetFunc();
-  }
+  Serial.print("Uploading data....\t");
 
   // We now create a URI for the request
-  String url = "/input/pw77b7jYOvcXa4xWmjbL?private_key=64nn0nV65AhrAEeBWgZN&rotation=";
+  String url = "/input/Yxy1m6L1QQC4MvQVDNm2soX8Ajr?private_key=YGNZK28Z77s0BwdVQANDHjzK0Oa&rotation=";
   url += String(rotation);
   url += "&speed=";
-  url += String(turnDir);
+  url += String(turnLevel);
   url += "&x=";
   url += String(location.x);
   url += "&y=";
@@ -796,9 +1059,15 @@ void uploadData () {
   url += "&screen=";
   url += String(isInScreen);
   url += "&tc=";
-  url += String(wifiConnectTime);
+  url += String(lastRotation);
   url += "&tr=";
   url += String(wifiRequestTime);
+  url += "&c=";
+  url += String(isClockwise);
+  url += "&r_north=";
+  url += String(northAngle);
+  url += "&name=";
+  url += String(robotName);
   //  url += streamId;
   //  url += "?private_key=";
   //  url += privateKey;
@@ -809,14 +1078,14 @@ void uploadData () {
   Serial.println(url);
 
   // This will send the request to the server
-  client.print("GET " + url + " HTTP/1.1\r\n" +
-               "Host: " + "data.sparkfun.com" + "\r\n" +
-               "Connection: close\r\n\r\n\n");
+  dataClient.print("GET " + url + " HTTP/1.1\r\n" +
+               "Host: " + dataHost + "\r\n" +
+               "Connection: keep-alive\r\n\r\n\n");
   unsigned long timeout = millis();
-  while (client.available() == 0) {
+  while (dataClient.available() == 0) {
     if (millis() - timeout > 5000) {
       Serial.println(">>> Client Timeout !");
-      client.stop();
+      dataClient.stop();
       return;
     }
   }
@@ -824,37 +1093,22 @@ void uploadData () {
   unsigned long lastRead = millis();
 
   // Read all the lines of the reply from server and print them to Serial
-  while (client.available()) {
+  while (dataClient.available()) {
     //    String line = client.readStringUntil('\r');
     //    Serial.print(line);
-    char c = client.read();
+    char c = dataClient.read();
     Serial.print(c);
 
     lastRead = millis();
   }
 }
 
-void fetchJson () {
-  stopTicker();
-  startTicker(150);
-  wifiConnectTime = 0;
+void fetchJson (String path, void (*callback)(char*)) {
+//  stopTicker();
+//  startTicker(150);
+  
   wifiRequestTime = 0;
   wifiTriggered = true;
-  
-  Serial.print("connecting to ");
-  Serial.println(host);
-
-  wifiConnectTime = millis();
-  /* time: 1000~1860ms */
-  // Use WiFiClient class to create TCP connections
-  WiFiClient client;
-  const int httpPort = 80;
-  if (!client.connect(host, httpPort)) {
-    Serial.println("connection failed, restart the programme");
-    resetFunc();
-  }
-  /* END */
-  wifiConnectTime = millis() - wifiConnectTime;
 
   // We now create a URI for the request
   String url = path;
@@ -874,7 +1128,7 @@ void fetchJson () {
                "Host: " + host + "\r\n" +
                "Cache-Control: no-cache, no-store, must-revalidate\r\n" +
                "Pragma: no-cache\r\nExpires: 0\r\n" +
-               "Connection: close\r\n\r\n\n");
+               "Connection: keep-alive\r\n\r\n\n");
   unsigned long timeout = millis();
   while (client.available() == 0) {
     if (millis() - timeout > 5000) {
@@ -923,11 +1177,11 @@ void fetchJson () {
   Serial.println("closing connection");
 
   Serial.println(F("Start json reading.\n"));
-  readJson(jsonInput);
+  callback(jsonInput);
   Serial.println(F("\nComplete json reading."));
 
-  stopTicker();
-  startTicker(tickerInterval);
+//  stopTicker();
+//  startTicker(tickerInterval);
   wifiTriggered = false;
 }
 
@@ -966,9 +1220,17 @@ void setup() {
   //  initMPU();
   initCompass();
 
-  ESP.wdtEnable(1000);
+  ESP.wdtEnable(2000);
 
-  startTicker(tickerInterval);
+//  startTicker(tickerInterval);
+//  loopCompass();
+//  loopCompass();
+//  loopCompass();
+//  loopCompass();
+//  loopCompass();
+//  lastRotation = rotation;
+  fetchJson(settingPath, &readSettingJson);
+  moveForward();
 }
 
 void loop() {
@@ -982,43 +1244,74 @@ void loop() {
 
     printVec("v: ", velocity);
   } else {
-    //      loopPort();
+//    loopPort();
     //      Serial.println(rotation);
-    resetMotor();
-    fetchJson();
+//    resetMotor();
+    fetchJson(movementPath, &readJson);
+//    rotateBy(90);
+//    rotateBy(270);
+    delay(500);
 
-    if (isInScreen) {
-      if (boundBy()) {
-        moveForward(1000);
-      }
-
-      // get away from enemy
-      if (isEnemyInScreen) {
-        rotateTo(getDirectionFrom(enemyLocation, false));
-        moveForward(1500);
-      }
-
-      if (isFriendInScreen) {
-        rotateTo(getDirectionFrom(friendLocation, true));
-        moveForward(1000);
-      }
-    } else {
-      // point back to origin and turn
-      if (isOddTrial) {
-        isOddTrial = false;
-        rotateTo(getDirectionFrom({0, 0}, true));
-        moveForward(1500);
+    if (!isDebug) {
+      if (isInScreen) {
+        if (isOutBound) {
+          resetMotor();
+        } else {
+          Serial.print("CW: ");
+          Serial.print(isClockwise);
+          Serial.print("\tlevel: ");
+          Serial.println(turnLevel);
+          if (isClockwise) {
+            moveMotor(1, levelsOutput[turnLevel].y, levelsOutput[turnLevel].x);
+          } else {
+            moveMotor(1, levelsOutput[turnLevel].x, levelsOutput[turnLevel].y);
+            
+          }
+//          if (!isSCTickerOn) {
+//            moveForward();
+//          }
+        }
+        
+  //      moveForward();
+  //      if (!boundBy()) {
+  //        Serial.println("in the bounday");
+  //        moveForward();
+  //      }
+  
+        // get away from enemy
+  //      if (isEnemyInScreen) {
+  //        rotateTo(getDirectionFrom(enemyLocation, false));
+  //        moveForward();
+  //      }
+  //
+  //      if (isFriendInScreen) {
+  //        rotateTo(getDirectionFrom(friendLocation, true));
+  //        moveForward();
+  //      }
       } else {
-        isOddTrial = true;
-        rotateTo(getDirectionFrom({0, 0}, false));
-        moveBackward(1500);
+        resetMotor();
+  //      moveBackward();
+        
+        // point back to origin and turn
+  //      if (isOddTrial) {
+  //        isOddTrial = false;
+  //        rotateTo(getDirectionFrom({0, 0}, true));
+  //        moveForward();
+  //      } else {
+  //        isOddTrial = true;
+  //        rotateTo(getDirectionFrom({0, 0}, false));
+  //        moveBackward();
+  //      }
       }
     }
+    
 
+    delay(500);
     Serial.print("upload? ");
     Serial.println(digitalRead(WIFI_UPLOAD_DATA_PIN));
-    if (digitalRead(WIFI_UPLOAD_DATA_PIN) == HIGH) {
+    if (isUploading && digitalRead(WIFI_UPLOAD_DATA_PIN) != LOW) {
       uploadData();
     }
+    delay(500);
   }
 }

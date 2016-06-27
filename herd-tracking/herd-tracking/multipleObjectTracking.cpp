@@ -34,8 +34,8 @@ int S_MAX = 256;
 int V_MIN = 0;
 int V_MAX = 256;
 //default capture width and height
-const int FRAME_WIDTH = 640;
-const int FRAME_HEIGHT = 480;
+const int FRAME_WIDTH = 960;
+const int FRAME_HEIGHT = 540;
 //max number of objects to be detected in frame
 const int MAX_NUM_OBJECTS = 10;
 //minimum and maximum object area
@@ -59,7 +59,29 @@ int kernel_size = 3;
 char* window_name = "Edge Map";
 //char TrackbarNames[6][50];
 
-json outputJson;
+// setting for the herds
+const int northAngle = ANIMAL_NORTH_ANGLE;
+const int eastAngle = (northAngle + 90) % 360;
+const int southAngle = (eastAngle + 90) % 360;
+const int westAngle = (southAngle + 90) % 360;
+
+bool isWritingJson = true;
+json herdsSetting = {
+    {
+        "northAngle", northAngle
+    }, {
+        "eastAngle", eastAngle
+    }, {
+        "southAngle", southAngle
+    }, {
+        "westAngle", westAngle
+    }, {
+        "scBuffer", 15
+    }
+};
+
+
+
 
 void on_trackbar( int, void* )
 {//This function gets called whenever a
@@ -298,10 +320,9 @@ void trackAnimal(Animal *theObject,Mat threshold,Mat HSV, Mat &cameraFeed){
             object.setType(theObject->getType());
             object.setColor(theObject->getColor());
             
-            theObject->setPos(object.getXPos(), object.getYPos());
+            theObject->setPos(object.getXPos() - FRAME_WIDTH / 2, FRAME_HEIGHT / 2 - object.getYPos());
             
             objects.push_back(object);
-            
             objectFound = true;
             
         } else {
@@ -311,37 +332,75 @@ void trackAnimal(Animal *theObject,Mat threshold,Mat HSV, Mat &cameraFeed){
         //let user know you found an object
         if(objectFound == true){
                 //draw object location on screen
-                drawAnimal(*theObject,objects,cameraFeed,temp,contours,hierarchy);
+            drawAnimal(*theObject,objects,cameraFeed,temp,contours,hierarchy);
         }
         
-        theObject->isOnScreen = objectFound;
+        theObject->setOnScreen(objectFound);
     } else {
         putText(cameraFeed,"TOO MUCH NOISE! ADJUST FILTER",Point(0,50),1,2,Scalar(0,0,255),2);
-        theObject->isOnScreen = false;
+        theObject->setOnScreen(false);
     }
     
 }
 
+void writeToJson (string path, string content) {
+    ofstream outputFile;
+    outputFile.open(path);
+    outputFile << content;
+    outputFile.close();
+}
+
 void writeJsonToFile (vector<Animal> animals) {
+    json outputAnimalJson = json::object();
     for(vector<Animal>::iterator it = animals.begin(); it != animals.end(); ++it) {
-        outputJson[it->getType()] = {
+        outputAnimalJson[it->getType()] = {
             {
-                "vx", it->getVelocity()[0]
+                "x", it->getXPos()
             }, {
-                "vy", it->getVelocity()[1]
-            }, {
-                "x", it->getPos().x - FRAME_WIDTH / 2
-            }, {
-                "y", FRAME_HEIGHT / 2 - it->getPos().y
+                "y", it->getYPos()
             }, {
                 "isOn", it->isOnScreen
             }
         };
+//        json outputAnimalJson = {
+//            {
+//                "type", it->getType()
+//            }, {
+//                "flockRotation", it->getFlockRotation()
+//            }, {
+//                "x", it->getPos().x
+//            }, {
+//                "y", it->getPos().y
+//            }, {
+//                "isOn", it->isOnScreen
+//            }, {
+//                "isOut", it->isOutside
+//            }, {
+//                "isDebug", false
+//            }, {
+//                "level", it->turnLevel
+//            }, {
+//                "isCW", it->isClockwise
+//            }
+//        };
+//        
+//        outputAnimalJson["levels"] = json::array();
+//        for (int i = 0; i < ANIMAL_NUM_OF_LEVELS; i++) {
+//            json levelOutput = {
+//                {
+//                    "a", it->levelsOutput[i][0]
+//                },{
+//                    "b", it->levelsOutput[i][1]
+//                }
+//            };
+//            outputAnimalJson["levels"].push_back(levelOutput);
+//        }
+//        
+//        writeToJson("/Users/PETEroid/Sites/json/herds/" + it->getType() + ".json", outputAnimalJson.dump());
+        
+        
     }
-    ofstream outputFile;
-    outputFile.open("/Users/PETEroid/Sites/json/output.json");
-    outputFile << outputJson.dump();
-    outputFile.close();
+    writeToJson("/Users/PETEroid/Sites/json/animals.json", outputAnimalJson.dump());
 }
 
 int main(int argc, char* argv[])
@@ -362,7 +421,8 @@ int main(int argc, char* argv[])
 	VideoCapture capture;
     
 	//open capture object at location zero (default location for webcam)
-    capture.open(1);
+    printf("opening webcam\n");
+    capture.open(0);
     
 	//set height and width of capture frame
 	capture.set(CV_CAP_PROP_FRAME_WIDTH,FRAME_WIDTH);
@@ -386,27 +446,34 @@ int main(int argc, char* argv[])
     Animal b("blue"), r("red"), g("green"), y("yellow");
     vector<Animal> animals;
 //    animals.push_back(b);
-    animals.push_back(r);
-    animals.push_back(g);
-    animals.push_back(y);
     
-    // init json structure
+//    r.setPos(0, 0);
+//    r.setVelocity(Vec2f(1, 0));
+//    setr = true;
+////
+//    g.setPos(10, 10);
+//    g.setVelocity(Vec2f(0, 1));
+//    g.isOnScreen = true;
+//
+//    y.setPos(15, 15);
+//    y.setVelocity(Vec2f(1, 1));
+//    y.isOnScreen = true;
+    
+//    animals.push_back(r);
+//    animals.push_back(g);
+//    animals.push_back(y);
+    
+//    b.role = role_predator;
+    animals.push_back(b);
+    
+    // write the setting
+    herdsSetting["animals"] = json::array();
     for(vector<Animal>::iterator it = animals.begin(); it != animals.end(); ++it) {
-        outputJson[it->getType()] = {
-            {
-                "x", 0
-            }, {
-                "y", 0
-            }, {
-                "vx", 0
-            }, {
-                "vy", 0
-            }, {
-                "isOn", false
-            }
-        };
+        herdsSetting["animals"].push_back(it->getType());
     }
-//    cout << outputJson.dump();
+    writeToJson("/Users/PETEroid/Sites/json/setting.json", herdsSetting.dump());
+    
+    
     
 	while(1){
 		//store image to matrix
@@ -442,7 +509,11 @@ int main(int argc, char* argv[])
 	  		createTrackbar( "Min Threshold:", window_name, &lowThreshold, max_lowThreshold);
 	  		/// Show the image
 			trackFilteredObject(threshold,HSV,cameraFeed);
-		} else {
+            
+//            for (int i = 0; i < animals.size(); i++) {
+//                animals[i].flock(animals);
+//            }
+        } else {
             
 //            for (int i = 0; i < objects.size(); i++) {
 //                // track the object in the vector
@@ -458,9 +529,18 @@ int main(int argc, char* argv[])
                 inRange(HSV, animals[i].getHSVmin(), animals[i].getHSVmax(), threshold);
                 morphOps(threshold);
                 trackAnimal(&animals[i], threshold, HSV, cameraFeed);
+                
+                animals[i].flock(animals);
+                
+                if (animals[i].isOnScreen) {
+                    Point2f pt = Point(animals[i].getXPos() + FRAME_WIDTH / 2, FRAME_HEIGHT / 2 - animals[i].getYPos());
+                    
+                    arrowedLine(cameraFeed, pt, pt + Point2f(animals[i].finalForce[0], animals[i].finalForce[1]) * 15, Scalar(255, 0, 0), 2, 8, 0, 0.4);
+                }
             }
             
-            writeJsonToFile(animals);
+            if (isWritingJson)
+                writeJsonToFile(animals);
 		}
         gettimeofday(&t2, NULL);
         

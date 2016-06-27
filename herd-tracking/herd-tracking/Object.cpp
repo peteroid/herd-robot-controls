@@ -17,8 +17,8 @@ Object::Object(string name){
 		//TODO: use "calibration mode" to find HSV min
 		//and HSV max values
 
-		setHSVmin(Scalar(102, 212, 206));
-		setHSVmax(Scalar(118, 256, 256));
+		setHSVmin(Scalar(0, 100, 83));
+		setHSVmax(Scalar(32, 172, 168));
 
 		//BGR value for Green:
 		setColor(Scalar(255,0,0));
@@ -29,8 +29,8 @@ Object::Object(string name){
 		//TODO: use "calibration mode" to find HSV min
 		//and HSV max values
 
-		setHSVmin(Scalar(56, 153, 147));
-		setHSVmax(Scalar(126, 256, 256));
+		setHSVmin(Scalar(162, 26, 198));
+		setHSVmax(Scalar(218, 94, 256));
 
 		//BGR value for Yellow:
 		setColor(Scalar(0,255,0));
@@ -41,8 +41,8 @@ Object::Object(string name){
 		//TODO: use "calibration mode" to find HSV min
 		//and HSV max values
 
-        setHSVmin(Scalar(157, 189, 133));
-        setHSVmax(Scalar(221, 256, 232));
+        setHSVmin(Scalar(29, 70, 159));
+        setHSVmax(Scalar(68, 170, 211));
 
 		//BGR value for Red:
 		setColor(Scalar(0,255,255));
@@ -53,14 +53,16 @@ Object::Object(string name){
 		//TODO: use "calibration mode" to find HSV min
 		//and HSV max values
 
-		setHSVmin(Scalar(0, 160, 194));
-        setHSVmax(Scalar(35, 243, 256));
+		setHSVmin(Scalar(0, 179, 33));
+        setHSVmax(Scalar(4, 256, 137));
 
 		//BGR value for Red:
 		setColor(Scalar(0,0,255));
 
 	}
 }
+
+
 
 Object::~Object(void)
 {
@@ -119,4 +121,17 @@ void Object::setHSVmin(Scalar min){
 void Object::setHSVmax(Scalar max){
 
 	Object::HSVmax = max;
+}
+
+void Object::setOnScreen (bool is) {
+    if (is) {
+        Object::isOnScreen = true;
+        screenThreshold = OFF_SCREEN_THRESHOLD;
+    } else {
+        if (screenThreshold == 0) {
+            Object::isOnScreen = false;
+        } else {
+            screenThreshold--;
+        }
+    }
 }
